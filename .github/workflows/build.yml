@@ -1,4 +1,4 @@
-name: Build libimobiledevice arm64-v8a
+name: Build libusb arm64-v8a
 
 on:
   push:
@@ -31,52 +31,14 @@ jobs:
           echo "PREFIX=$GITHUB_WORKSPACE/install-arm64" >> $GITHUB_ENV
           echo "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
 
-      - name: Extract all tarballs
+      - name: Extract libusb tarball
         run: |
-          for f in *.tar.bz2; do
-            echo "=== Extracting $f ==="
-            tar -xjf "$f"
-          done
-          ls -d */
+          ls -la
+          echo "=== Extrayendo libusb-1.0.30.tar.gz ==="
+          tar -xzf libusb-1.0.30.tar.gz
+          ls -la libusb-1.0.30/
 
-      - name: Build OpenSSL for arm64-v8a
-        run: |
-          export PATH=$TOOLCHAIN/bin:$PATH
-          wget -q https://www.openssl.org/source/openssl-3.0.15.tar.gz
-          tar -xzf openssl-3.0.15.tar.gz
-          cd openssl-3.0.15
-          ./Configure android-arm64 \
-            -D__ANDROID_API__=$API \
-            --prefix=$PREFIX \
-            --openssldir=$PREFIX/ssl \
-            shared
-          make -j$(nproc)
-          make install_sw
-
-      - name: Setup zlib from NDK sysroot
-        run: |
-          echo "=== Buscando libz.so en el sysroot del NDK ==="
-          find $TOOLCHAIN/sysroot -name "libz.so" 2>/dev/null || true
-
-          mkdir -p $PREFIX/lib/pkgconfig
-
-          cat > $PREFIX/lib/pkgconfig/zlib.pc <<EOF
-          prefix=$TOOLCHAIN/sysroot/usr
-          exec_prefix=\${prefix}
-          libdir=\${prefix}/lib
-          sharedlibdir=\${libdir}
-          includedir=\${prefix}/include
-
-          Name: zlib
-          Description: zlib compression library (Android NDK)
-          Version: 1.2.13
-
-          Requires:
-          Libs: -lz
-          Cflags: -I\${includedir}
-          EOF
-
-      - name: Build libplist
+      - name: Build libusb for arm64-v8a
         run: |
           export PATH=$TOOLCHAIN/bin:$PATH
           export CC=$TOOLCHAIN/bin/${TARGET}${API}-clang
@@ -84,134 +46,27 @@ jobs:
           export AR=$TOOLCHAIN/bin/llvm-ar
           export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
           export STRIP=$TOOLCHAIN/bin/llvm-strip
-          export PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig
-          export PKG_CONFIG_LIBDIR=$PREFIX/lib/pkgconfig
 
-          cd libplist-2.7.0
-          ./configure --build=x86_64-linux-gnu --host=$TARGET --prefix=$PREFIX \
-            --enable-shared --disable-static --without-cython
-          make -j$(nproc)
-          make install
+          cd libusb-1.0.30
 
-      - name: Build libcurl for arm64-v8a
-        run: |
-          export PATH=$TOOLCHAIN/bin:$PATH
-          export CC=$TOOLCHAIN/bin/${TARGET}${API}-clang
-          export AR=$TOOLCHAIN/bin/llvm-ar
-          export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
-          export STRIP=$TOOLCHAIN/bin/llvm-strip
-          export PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig
-          export PKG_CONFIG_LIBDIR=$PREFIX/lib/pkgconfig
-          export CPPFLAGS="-I$PREFIX/include"
-          export LDFLAGS="-L$PREFIX/lib"
-
-          wget -q https://curl.se/download/curl-8.10.1.tar.gz
-          tar -xzf curl-8.10.1.tar.gz
-          cd curl-8.10.1
-
+          # libusb usa autotools y necesita udev en Linux.
+          # En Android no hay udev, así que lo desactivamos:
+          #   --disable-udev       → evita buscar libudev
+          #   --disable-timerfd    → evita timerfd que no es estándar en Android
+          #   --enable-udev=no     → refuerza lo anterior
           ./configure \
-            --host=$TARGET \
             --build=x86_64-linux-gnu \
+            --host=$TARGET \
             --prefix=$PREFIX \
             --enable-shared \
             --disable-static \
-            --with-openssl=$PREFIX \
-            --without-libpsl \
-            --without-brotli \
-            --without-zstd \
-            --without-libidn2 \
-            --without-librtmp \
-            --without-nghttp2 \
-            --disable-ftp \
-            --disable-ldap \
-            --disable-ldaps \
-            --disable-rtsp \
-            --disable-dict \
-            --disable-telnet \
-            --disable-tftp \
-            --disable-pop3 \
-            --disable-imap \
-            --disable-smb \
-            --disable-smtp \
-            --disable-gopher \
-            --disable-mqtt \
-            --disable-manual \
-            --disable-verbose
+            --disable-udev \
+            --disable-timerfd \
+            --disable-examples-build \
+            --disable-tests-build
 
-          make -j$(nproc)
-          make install
-
-      - name: Build libimobiledevice-glue
-        run: |
-          export PATH=$TOOLCHAIN/bin:$PATH
-          export CC=$TOOLCHAIN/bin/${TARGET}${API}-clang
-          export CXX=$TOOLCHAIN/bin/${TARGET}${API}-clang++
-          export AR=$TOOLCHAIN/bin/llvm-ar
-          export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
-          export STRIP=$TOOLCHAIN/bin/llvm-strip
-          export PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig
-          export PKG_CONFIG_LIBDIR=$PREFIX/lib/pkgconfig
-
-          cd libimobiledevice-glue-1.3.2
-          ./configure --build=x86_64-linux-gnu --host=$TARGET --prefix=$PREFIX \
-            --enable-shared --disable-static
-          make -j$(nproc)
-          make install
-
-      - name: Build libtatsu
-        run: |
-          export PATH=$TOOLCHAIN/bin:$PATH
-          export CC=$TOOLCHAIN/bin/${TARGET}${API}-clang
-          export CXX=$TOOLCHAIN/bin/${TARGET}${API}-clang++
-          export AR=$TOOLCHAIN/bin/llvm-ar
-          export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
-          export STRIP=$TOOLCHAIN/bin/llvm-strip
-          export PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig
-          export PKG_CONFIG_LIBDIR=$PREFIX/lib/pkgconfig
-
-          cd libtatsu-1.0.5
-          ./configure --build=x86_64-linux-gnu --host=$TARGET --prefix=$PREFIX \
-            --enable-shared --disable-static
-          make -j$(nproc)
-          make install
-
-      - name: Build libusbmuxd
-        run: |
-          export PATH=$TOOLCHAIN/bin:$PATH
-          export CC=$TOOLCHAIN/bin/${TARGET}${API}-clang
-          export CXX=$TOOLCHAIN/bin/${TARGET}${API}-clang++
-          export AR=$TOOLCHAIN/bin/llvm-ar
-          export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
-          export STRIP=$TOOLCHAIN/bin/llvm-strip
-          export PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig
-          export PKG_CONFIG_LIBDIR=$PREFIX/lib/pkgconfig
-
-          cd libusbmuxd-2.1.1
-          ./configure --build=x86_64-linux-gnu --host=$TARGET --prefix=$PREFIX \
-            --enable-shared --disable-static --without-cython
-          make -j$(nproc)
-          make install
-
-      - name: Build libimobiledevice
-        run: |
-          export PATH=$TOOLCHAIN/bin:$PATH
-          export CC=$TOOLCHAIN/bin/${TARGET}${API}-clang
-          export CXX=$TOOLCHAIN/bin/${TARGET}${API}-clang++
-          export AR=$TOOLCHAIN/bin/llvm-ar
-          export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
-          export STRIP=$TOOLCHAIN/bin/llvm-strip
-          export PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig
-          export PKG_CONFIG_LIBDIR=$PREFIX/lib/pkgconfig
-
-          cd libimobiledevice-1.4.0
-
-          ./configure --build=x86_64-linux-gnu --host=$TARGET --prefix=$PREFIX \
-            --enable-shared --disable-static --without-cython \
-            ac_cv_lib_pthread_pthread_create=yes \
-            ac_cv_lib_pthread_pthread_cancel=yes \
-            ac_cv_lib_pthread_pthread_once=yes
-
-          # Quitar -lpthread de todos los Makefiles: Android lo incluye en libc
+          # libusb todavía mete -lpthread en algunos Makefiles.
+          # Android lo tiene dentro de libc, así que lo quitamos.
           find . -name "Makefile" -exec sed -i 's/-lpthread//g' {} \;
           find . -name "*.la" -exec sed -i 's/-lpthread//g' {} \; 2>/dev/null || true
 
@@ -222,10 +77,16 @@ jobs:
         run: |
           echo "=== Contenido de install-arm64 ==="
           find $PREFIX -type f | sort
+          echo ""
+          echo "=== Arquitectura de la .so ==="
+          file $PREFIX/lib/libusb-1.0.so* 2>/dev/null || true
+          echo ""
+          echo "=== Dependencias ==="
+          readelf -d $PREFIX/lib/libusb-1.0.so* 2>/dev/null | grep NEEDED || true
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: libimobiledevice-arm64-v8a
+          name: libusb-arm64-v8a
           path: install-arm64/
           if-no-files-found: error
