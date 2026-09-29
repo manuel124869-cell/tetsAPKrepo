@@ -70,6 +70,55 @@ jobs:
           make -j$(nproc)
           make install
 
+      - name: Build libcurl for arm64-v8a
+        run: |
+          export PATH=$TOOLCHAIN/bin:$PATH
+          export CC=$TOOLCHAIN/bin/${TARGET}${API}-clang
+          export AR=$TOOLCHAIN/bin/llvm-ar
+          export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
+          export STRIP=$TOOLCHAIN/bin/llvm-strip
+          export PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig
+          export PKG_CONFIG_LIBDIR=$PREFIX/lib/pkgconfig
+
+          wget -q https://curl.se/download/curl-8.10.1.tar.gz
+          tar -xzf curl-8.10.1.tar.gz
+          cd curl-8.10.1
+
+          ./configure \
+            --host=$TARGET \
+            --build=x86_64-linux-gnu \
+            --prefix=$PREFIX \
+            --enable-shared \
+            --disable-static \
+            --with-openssl=$PREFIX \
+            --without-libpsl \
+            --without-brotli \
+            --without-zstd \
+            --without-libidn2 \
+            --without-librtmp \
+            --without-nghttp2 \
+            --disable-ftp \
+            --disable-ldap \
+            --disable-ldaps \
+            --disable-rtsp \
+            --disable-dict \
+            --disable-telnet \
+            --disable-tftp \
+            --disable-pop3 \
+            --disable-imap \
+            --disable-smb \
+            --disable-smtp \
+            --disable-gopher \
+            --disable-mqtt \
+            --disable-manual \
+            --disable-verbose
+
+          make -j$(nproc)
+          make install
+
+          echo "=== Verificando libcurl.pc ==="
+          ls -la $PREFIX/lib/pkgconfig/libcurl.pc
+
       - name: Build libimobiledevice-glue
         run: |
           export PATH=$TOOLCHAIN/bin:$PATH
@@ -120,56 +169,6 @@ jobs:
             --enable-shared --disable-static --without-cython
           make -j$(nproc)
           make install
-
-      - name: Build libcurl for arm64-v8a
-        run: |
-          export PATH=$TOOLCHAIN/bin:$PATH
-          export CC=$TOOLCHAIN/bin/${TARGET}${API}-clang
-          export AR=$TOOLCHAIN/bin/llvm-ar
-          export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
-          export STRIP=$TOOLCHAIN/bin/llvm-strip
-          export PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig
-          export PKG_CONFIG_LIBDIR=$PREFIX/lib/pkgconfig
-
-          wget -q https://curl.se/download/curl-8.10.1.tar.gz
-          tar -xzf curl-8.10.1.tar.gz
-          cd curl-8.10.1
-
-          ./configure \
-            --host=$TARGET \
-            --build=x86_64-linux-gnu \
-            --prefix=$PREFIX \
-            --enable-shared \
-            --disable-static \
-            --with-openssl=$PREFIX \
-            --without-libpsl \
-            --without-brotli \
-            --without-zstd \
-            --without-libidn2 \
-            --without-librtmp \
-            --without-nghttp2 \
-            --disable-ftp \
-            --disable-ldap \
-            --disable-ldaps \
-            --disable-rtsp \
-            --disable-dict \
-            --disable-telnet \
-            --disable-tftp \
-            --disable-pop3 \
-            --disable-imap \
-            --disable-smb \
-            --disable-smtp \
-            --disable-gopher \
-            --disable-mqtt \
-            --disable-manual \
-            --disable-verbose
-
-          make -j$(nproc)
-          make install
-
-          echo "=== Verificando libcurl.pc ==="
-          ls -la $PREFIX/lib/pkgconfig/libcurl.pc
-          cat $PREFIX/lib/pkgconfig/libcurl.pc
 
       - name: Build libimobiledevice
         run: |
