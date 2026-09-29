@@ -60,8 +60,6 @@ jobs:
 
           echo "=== Buscando libz.so en el sysroot del NDK ==="
           find $TOOLCHAIN/sysroot -name "libz.so" 2>/dev/null || true
-          echo "=== Buscando libz.a ==="
-          find $TOOLCHAIN/sysroot -name "libz.a" 2>/dev/null || true
 
           mkdir -p $PREFIX/lib/pkgconfig
 
@@ -216,7 +214,10 @@ jobs:
 
           cd libimobiledevice-1.4.0
           ./configure --build=x86_64-linux-gnu --host=$TARGET --prefix=$PREFIX \
-            --enable-shared --disable-static --without-cython
+            --enable-shared --disable-static --without-cython \
+            ac_cv_lib_pthread_pthread_create=yes \
+            ac_cv_lib_pthread_pthread_cancel=yes \
+            ac_cv_lib_pthread_pthread_once=yes
           make -j$(nproc)
           make install
 
