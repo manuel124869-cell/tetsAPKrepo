@@ -27,7 +27,7 @@ jobs:
         run: |
           echo "TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64" >> $GITHUB_ENV
           echo "TARGET=aarch64-linux-android" >> $GITHUB_ENV
-          echo "API=21" >> $GITHUB_ENV
+          echo "API=24" >> $GITHUB_ENV
           echo "PREFIX=$GITHUB_WORKSPACE/install-arm64" >> $GITHUB_ENV
           echo "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
 
@@ -80,10 +80,6 @@ jobs:
           export STRIP=$TOOLCHAIN/bin/llvm-strip
           export PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig
           export PKG_CONFIG_LIBDIR=$PREFIX/lib/pkgconfig
-
-          # Defines explícitos para que glue detecte Android correctamente
-          export CFLAGS="-DANDROID -D__ANDROID_API__=$API"
-          export CPPFLAGS="-DANDROID -D__ANDROID_API__=$API"
 
           cd libimobiledevice-glue-1.3.2
           ./configure --build=x86_64-linux-gnu --host=$TARGET --prefix=$PREFIX \
