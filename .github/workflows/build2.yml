@@ -1,0 +1,60 @@
+name: Build libplist arm64-v8a
+
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Inspect and extract
+        run: |
+          echo "=== Contenido del repo ==="
+          ls -la
+          echo "=== Contenido del tarball ==="
+          tar -tjf libplist-2.7.0.tar.bz2 | head -20
+          echo "=== Extrayendo ==="
+          tar -xjf libplist-2.7.0.tar.bz2
+          echo "=== Después de extraer ==="
+          ls -la
+
+      - name: Setup NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26d
+
+      - name: Create toolchain file
+        run: |
+          cat > android-arm64.cmake <<'EOF'
+          set(CMAKE_SYSTEM_NAME Android)
+          set(CMAKE_SYSTEM_VERSION 21)
+          set(CMAKE_ANDROID_ARCH_ABI arm64-v8a)
+          set(CMAKE_ANDROID_NDK $ENV{ANDROID_NDK_HOME})
+          set(CMAKE_ANDROID_STL c++_shared)
+          set(CMAKE_C_COMPILER $ENV{ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang)
+          EOF
+
+      - name: Build
+        run: |
+          # Buscar el directorio que contiene CMakeLists.txt
+          SRC_DIR=$(find . -maxdepth 3 -name CMakeLists.txt -exec dirname {} \; | head -1)
+          echo "Compilando en: $SRC_DIR"
+          cd "$SRC_DIR"
+          mkdir -p build && cd build
+          cmake .. \
+            -DCMAKE_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/android-arm64.cmake \
+            -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/install-arm64 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=ON \
+            -DENABLE_PYTHON=OFF \
+            -DENABLE_TOOLS=OFF \
+            -DENABLE_DOCS=OFF
+          make -j$(nproc)
+          make install
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libplist-arm64-v8a
+          path: install-arm64/
