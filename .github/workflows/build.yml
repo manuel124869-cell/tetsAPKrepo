@@ -56,21 +56,49 @@ jobs:
       - name: Build zlib for arm64-v8a
         run: |
           export PATH=$TOOLCHAIN/bin:$PATH
+          export CHOST=$TARGET
           export CC=$TOOLCHAIN/bin/${TARGET}${API}-clang
           export AR=$TOOLCHAIN/bin/llvm-ar
           export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
           export STRIP=$TOOLCHAIN/bin/llvm-strip
+          export CFLAGS="-fPIC -O2 -D__ANDROID_API__=$API"
 
           wget -q https://zlib.net/zlib-1.3.1.tar.gz
           tar -xzf zlib-1.3.1.tar.gz
           cd zlib-1.3.1
 
           ./configure --prefix=$PREFIX --static
-          make -j$(nproc)
-          make install
+
+          # Forzar compilador y herramientas en el Makefile generado
+          sed -i "s|^CC=.*|CC=$CC|" Makefile
+          sed -i "s|^AR=.*|AR=$AR|" Makefile
+          sed -i "s|^RANLIB=.*|RANLIB=$RANLIB|" Makefile
+
+          make -j$(nproc) libz.a
+
+          mkdir -p $PREFIX/lib $PREFIX/include $PREFIX/lib/pkgconfig
+          cp libz.a $PREFIX/lib/
+          cp zlib.h zconf.h $PREFIX/include/
+
+          cat > $PREFIX/lib/pkgconfig/zlib.pc <<EOF
+          prefix=$PREFIX
+          exec_prefix=\${prefix}
+          libdir=\${exec_prefix}/lib
+          sharedlibdir=\${libdir}
+          includedir=\${prefix}/include
+
+          Name: zlib
+          Description: zlib compression library
+          Version: 1.3.1
+
+          Requires:
+          Libs: -L\${libdir} -lz
+          Cflags: -I\${includedir}
+          EOF
 
           echo "=== Verificando zlib.pc ==="
-          ls -la $PREFIX/lib/pkgconfig/zlib.pc
+          cat $PREFIX/lib/pkgconfig/zlib.pc
+          ls -la $PREFIX/lib/libz.a
 
       - name: Build libplist
         run: |
@@ -139,7 +167,6 @@ jobs:
           make install
 
           echo "=== Verificando libcurl.pc ==="
-          ls -la $PREFIX/lib/pkgconfig/libcurl.pc
           cat $PREFIX/lib/pkgconfig/libcurl.pc | head -30
 
       - name: Build libimobiledevice-glue
