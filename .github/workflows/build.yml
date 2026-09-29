@@ -8,8 +8,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Extract libplist
-        run: tar -xjf libplist-2.7.0.tar.bz2
+      - name: Inspect and extract
+        run: |
+          echo "=== Contenido del repo ==="
+          ls -la
+          echo "=== Contenido del tarball ==="
+          tar -tjf libplist-2.7.0.tar.bz2 | head -20
+          echo "=== Extrayendo ==="
+          tar -xjf libplist-2.7.0.tar.bz2
+          echo "=== Después de extraer ==="
+          ls -la
 
       - name: Setup NDK
         uses: nttld/setup-ndk@v1
@@ -29,8 +37,11 @@ jobs:
 
       - name: Build
         run: |
-          cd libplist-2.7.0
-          mkdir build && cd build
+          # Buscar el directorio que contiene CMakeLists.txt
+          SRC_DIR=$(find . -maxdepth 3 -name CMakeLists.txt -exec dirname {} \; | head -1)
+          echo "Compilando en: $SRC_DIR"
+          cd "$SRC_DIR"
+          mkdir -p build && cd build
           cmake .. \
             -DCMAKE_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/android-arm64.cmake \
             -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/install-arm64 \
