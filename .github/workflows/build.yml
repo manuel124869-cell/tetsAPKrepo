@@ -36,7 +36,24 @@ jobs:
           ls -la
           echo "=== Extrayendo libusb-1.0.30.tar.gz ==="
           tar -xzf libusb-1.0.30.tar.gz
+          echo "=== Contenido ==="
           ls -la libusb-1.0.30/
+          echo "=== ¿Existe configure? ==="
+          ls -la libusb-1.0.30/configure 2>/dev/null || echo "NO existe configure — hay que generarlo"
+          ls -la libusb-1.0.30/configure.ac 2>/dev/null && echo "configure.ac SÍ existe"
+
+      - name: Generate configure (autoreconf)
+        run: |
+          export PATH=$TOOLCHAIN/bin:$PATH
+
+          cd libusb-1.0.30
+
+          # Generar el configure con autoreconf
+          autoreconf -fiv
+
+          echo "=== Después de autoreconf ==="
+          ls -la configure
+          ls -la Makefile.in 2>/dev/null || true
 
       - name: Build libusb for arm64-v8a
         run: |
@@ -49,11 +66,6 @@ jobs:
 
           cd libusb-1.0.30
 
-          # libusb usa autotools y necesita udev en Linux.
-          # En Android no hay udev, así que lo desactivamos:
-          #   --disable-udev       → evita buscar libudev
-          #   --disable-timerfd    → evita timerfd que no es estándar en Android
-          #   --enable-udev=no     → refuerza lo anterior
           ./configure \
             --build=x86_64-linux-gnu \
             --host=$TARGET \
@@ -65,8 +77,7 @@ jobs:
             --disable-examples-build \
             --disable-tests-build
 
-          # libusb todavía mete -lpthread en algunos Makefiles.
-          # Android lo tiene dentro de libc, así que lo quitamos.
+          # Quitar -lpthread de los Makefiles generados (Android lo incluye en libc)
           find . -name "Makefile" -exec sed -i 's/-lpthread//g' {} \;
           find . -name "*.la" -exec sed -i 's/-lpthread//g' {} \; 2>/dev/null || true
 
