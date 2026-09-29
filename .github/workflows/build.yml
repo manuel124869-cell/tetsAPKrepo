@@ -1,0 +1,72 @@
+name: Build libplist arm64-v8a
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify tarball
+        run: |
+          ls -la
+          echo "=== Contenido del tarball ==="
+          tar -tjf libplist-2.7.0.tar.bz2 | head -10
+
+      - name: Extract tarball
+        run: |
+          tar -xjf libplist-2.7.0.tar.bz2
+          ls -la libplist-2.7.0/
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26d
+
+      - name: Configure and build
+        run: |
+          export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
+          export TARGET=aarch64-linux-android
+          export API=21
+          export AR=$TOOLCHAIN/bin/llvm-ar
+          export CC=$TOOLCHAIN/bin/${TARGET}${API}-clang
+          export AS=$CC
+          export CXX=$TOOLCHAIN/bin/${TARGET}${API}-clang++
+          export LD=$TOOLCHAIN/bin/ld
+          export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
+          export STRIP=$TOOLCHAIN/bin/llvm-strip
+          export PATH=$TOOLCHAIN/bin:$PATH
+
+          echo "=== Compilador a usar ==="
+          $CC --version
+
+          cd libplist-2.7.0
+          ./configure \
+            --host=$TARGET \
+            --prefix=$GITHUB_WORKSPACE/install-arm64 \
+            --enable-shared \
+            --disable-static \
+            --without-cython
+
+          make -j$(nproc)
+          make install
+
+      - name: Verify output
+        run: |
+          echo "=== Contenido de install-arm64 ==="
+          find $GITHUB_WORKSPACE/install-arm64 -type f
+          echo "=== Arquitectura de la .so ==="
+          file $GITHUB_WORKSPACE/install-arm64/lib/libplist-2.0.so* 2>/dev/null || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libplist-arm64-v8a
+          path: install-arm64/
+          if-no-files-found: error
