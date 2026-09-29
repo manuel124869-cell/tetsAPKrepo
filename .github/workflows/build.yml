@@ -53,52 +53,36 @@ jobs:
           make -j$(nproc)
           make install_sw
 
-      - name: Build zlib for arm64-v8a
+      - name: Setup zlib from NDK sysroot
         run: |
-          export PATH=$TOOLCHAIN/bin:$PATH
-          export CHOST=$TARGET
-          export CC=$TOOLCHAIN/bin/${TARGET}${API}-clang
-          export AR=$TOOLCHAIN/bin/llvm-ar
-          export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
-          export STRIP=$TOOLCHAIN/bin/llvm-strip
-          export CFLAGS="-fPIC -O2 -D__ANDROID_API__=$API"
+          SYSLIB=$TOOLCHAIN/sysroot/usr/lib/${TARGET}${API}
+          SYSLIB_ALT=$TOOLCHAIN/sysroot/usr/lib/${TARGET}
 
-          wget -q https://zlib.net/zlib-1.3.1.tar.gz
-          tar -xzf zlib-1.3.1.tar.gz
-          cd zlib-1.3.1
+          echo "=== Buscando libz.so en el sysroot del NDK ==="
+          find $TOOLCHAIN/sysroot -name "libz.so" 2>/dev/null || true
+          echo "=== Buscando libz.a ==="
+          find $TOOLCHAIN/sysroot -name "libz.a" 2>/dev/null || true
 
-          ./configure --prefix=$PREFIX --static
-
-          # Forzar compilador y herramientas en el Makefile generado
-          sed -i "s|^CC=.*|CC=$CC|" Makefile
-          sed -i "s|^AR=.*|AR=$AR|" Makefile
-          sed -i "s|^RANLIB=.*|RANLIB=$RANLIB|" Makefile
-
-          make -j$(nproc) libz.a
-
-          mkdir -p $PREFIX/lib $PREFIX/include $PREFIX/lib/pkgconfig
-          cp libz.a $PREFIX/lib/
-          cp zlib.h zconf.h $PREFIX/include/
+          mkdir -p $PREFIX/lib/pkgconfig
 
           cat > $PREFIX/lib/pkgconfig/zlib.pc <<EOF
-          prefix=$PREFIX
+          prefix=$TOOLCHAIN/sysroot/usr
           exec_prefix=\${prefix}
-          libdir=\${exec_prefix}/lib
+          libdir=\${prefix}/lib
           sharedlibdir=\${libdir}
           includedir=\${prefix}/include
 
           Name: zlib
-          Description: zlib compression library
-          Version: 1.3.1
+          Description: zlib compression library (Android NDK)
+          Version: 1.2.13
 
           Requires:
-          Libs: -L\${libdir} -lz
+          Libs: -lz
           Cflags: -I\${includedir}
           EOF
 
-          echo "=== Verificando zlib.pc ==="
+          echo "=== zlib.pc creado ==="
           cat $PREFIX/lib/pkgconfig/zlib.pc
-          ls -la $PREFIX/lib/libz.a
 
       - name: Build libplist
         run: |
@@ -140,7 +124,6 @@ jobs:
             --enable-shared \
             --disable-static \
             --with-openssl=$PREFIX \
-            --with-zlib=$PREFIX \
             --without-libpsl \
             --without-brotli \
             --without-zstd \
@@ -167,7 +150,7 @@ jobs:
           make install
 
           echo "=== Verificando libcurl.pc ==="
-          cat $PREFIX/lib/pkgconfig/libcurl.pc | head -30
+          cat $PREFIX/lib/pkgconfig/libcurl.pc | head -40
 
       - name: Build libimobiledevice-glue
         run: |
